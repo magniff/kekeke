@@ -18,9 +18,15 @@ pub struct Transaction {
 }
 
 #[derive(Debug, Clone)]
-pub struct WidthdrawAction {
+pub enum ActionKind {
+    Deposit { amount: Decimal },
+    Withdrawal { amount: Decimal },
+}
+
+#[derive(Debug, Clone)]
+pub struct Action {
     pub cid: u16,
-    pub amount: Decimal,
+    pub kind: ActionKind,
     pub disputed: bool,
 }
 
