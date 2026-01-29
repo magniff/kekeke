@@ -17,7 +17,7 @@ impl Default for Payments {
 }
 
 impl Payments {
-    pub fn process_transaction(&mut self, transaction: Transaction) {
+    pub fn process_transaction(&mut self, transaction: &Transaction) {
         let account = self.get_account_mut(transaction.cid);
         if account.locked {
             return;
@@ -234,7 +234,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -274,7 +274,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -286,6 +286,51 @@ mod tests {
                     total: dec!(30),
                     held: dec!(20),
                     locked: false,
+                    has_activity: true
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn test_deposit_dispute_force() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit { amount: dec!(10.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Deposit { amount: dec!(20.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Dispute,
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Chargeback,
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        let active_clients = get_active_accounts(&payments);
+        assert_eq!(
+            active_clients,
+            vec![(
+                0,
+                Account {
+                    total: dec!(30),
+                    held: dec!(0),
+                    locked: true,
                     has_activity: true
                 }
             )]
@@ -314,57 +359,12 @@ mod tests {
             Transaction {
                 cid: 0,
                 tid: 1,
-                kind: TransactionKind::Chargeback,
-            },
-        ];
-
-        for transaction in transactions {
-            payments.process_transaction(transaction);
-        }
-
-        let active_clients = get_active_accounts(&payments);
-        assert_eq!(
-            active_clients,
-            vec![(
-                0,
-                Account {
-                    total: dec!(30),
-                    held: dec!(0),
-                    locked: true,
-                    has_activity: true
-                }
-            )]
-        );
-    }
-
-    #[test]
-    fn test_deposit_dispute_resolve() {
-        let mut payments = Payments::default();
-        let transactions = vec![
-            Transaction {
-                cid: 0,
-                tid: 0,
-                kind: TransactionKind::Deposit { amount: dec!(10.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Deposit { amount: dec!(20.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Dispute,
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
                 kind: TransactionKind::Resolve,
             },
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -404,7 +404,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -439,7 +439,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -479,7 +479,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -529,7 +529,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -574,7 +574,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);
@@ -619,7 +619,7 @@ mod tests {
         ];
 
         for transaction in transactions {
-            payments.process_transaction(transaction);
+            payments.process_transaction(&transaction);
         }
 
         let active_clients = get_active_accounts(&payments);

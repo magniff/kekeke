@@ -26,7 +26,7 @@ fn process_csv(payments: &mut Payments, input_path: &str) -> anyhow::Result<()> 
         .deserialize::<Transaction>()
     {
         match result {
-            Ok(transaction) => payments.process_transaction(transaction),
+            Ok(transaction) => payments.process_transaction(&transaction),
             // According to the spec we are not suppose to fatal the process should we encounter a
             // faulty transaction, so, we'll just complain and proceed
             Err(deserialization_error) => {
