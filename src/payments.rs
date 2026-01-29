@@ -19,23 +19,19 @@ impl Default for Payments {
 impl Payments {
     pub fn process_transaction(&mut self, transaction: Transaction) {
         let account = self.get_account_mut(transaction.cid);
-        account.has_activity = true;
-
-        // Bail early if account is locked
         if account.locked {
             return;
         }
 
+        account.has_activity = true;
         match transaction.kind {
             // Processing deposits
             TransactionKind::Deposit { amount } => {
-                account.has_activity = true;
                 account.total += amount;
             }
 
             // Processing withdrawals
             TransactionKind::Withdrawal { amount } => {
-                account.has_activity = true;
                 if account.get_available() >= amount {
                     account.total -= amount;
                     self.actions.insert(
