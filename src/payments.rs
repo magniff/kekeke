@@ -636,4 +636,304 @@ mod tests {
             )]
         );
     }
+    #[test]
+    fn test_withdraw_dispute_double_spend() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(100.0),
+                },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Dispute,
+            },
+            Transaction {
+                cid: 0,
+                tid: 2,
+                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        assert_eq!(
+            get_active_accounts(&payments),
+            vec![(
+                0,
+                Account {
+                    total: dec!(50.0),
+                    held: dec!(50.0),
+                    locked: false,
+                    has_activity: true
+                }
+            )]
+        );
+
+        payments.process_transaction(&Transaction {
+            cid: 0,
+            tid: 1,
+            kind: TransactionKind::Resolve,
+        });
+
+        assert_eq!(
+            get_active_accounts(&payments),
+            vec![(
+                0,
+                Account {
+                    total: dec!(50.0),
+                    held: dec!(0),
+                    locked: false,
+                    has_activity: true
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn test_no_dispute_for_failed_transaction() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit { amount: dec!(10.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Withdrawal { amount: dec!(20.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Dispute,
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Resolve,
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        assert_eq!(
+            get_active_accounts(&payments),
+            vec![(
+                0,
+                Account {
+                    total: dec!(10.0),
+                    held: dec!(0.0),
+                    locked: false,
+                    has_activity: true
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn test_multi_user_separate_accounts() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(100.0),
+                },
+            },
+            Transaction {
+                cid: 1,
+                tid: 1,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(200.0),
+                },
+            },
+            Transaction {
+                cid: 0,
+                tid: 2,
+                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
+            },
+            Transaction {
+                cid: 1,
+                tid: 3,
+                kind: TransactionKind::Withdrawal { amount: dec!(75.0) },
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        let active_clients = get_active_accounts(&payments);
+        assert_eq!(active_clients.len(), 2);
+        assert_eq!(
+            active_clients[0],
+            (
+                0,
+                Account {
+                    total: dec!(50.0),
+                    held: dec!(0),
+                    locked: false,
+                    has_activity: true
+                }
+            )
+        );
+        assert_eq!(
+            active_clients[1],
+            (
+                1,
+                Account {
+                    total: dec!(125.0),
+                    held: dec!(0),
+                    locked: false,
+                    has_activity: true
+                }
+            )
+        );
+    }
+
+    // Client 1 tries to dispute Client 0's transaction - should fail silently
+    #[test]
+    fn test_cross_client_dispute_attempt() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(100.0),
+                },
+            },
+            // Client 1 tries to dispute client 0's deposit
+            Transaction {
+                cid: 1,
+                tid: 0, // Same tid as client 0's deposit
+                kind: TransactionKind::Dispute,
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        assert_eq!(
+            get_active_accounts(&payments),
+            vec![
+                (
+                    0,
+                    Account {
+                        total: dec!(100.0),
+                        held: dec!(0),
+                        locked: false,
+                        has_activity: true
+                    }
+                ),
+                (
+                    1,
+                    Account {
+                        total: dec!(0.0),
+                        held: dec!(0),
+                        locked: false,
+                        has_activity: true
+                    }
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_one_locked_one_active() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            // Client 0 setup
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(100.0),
+                },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Dispute,
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Chargeback, // Locks client 0
+            },
+            // Client 1 setup
+            Transaction {
+                cid: 1,
+                tid: 2,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(200.0),
+                },
+            },
+            // Try to do more with client 0 - should all fail
+            Transaction {
+                cid: 0,
+                tid: 3,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(1000.0),
+                },
+            },
+            // Client 1 continues normally
+            Transaction {
+                cid: 1,
+                tid: 4,
+                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        // Client 0 is locked, deposit didn't go through
+        assert_eq!(
+            get_active_accounts(&payments),
+            vec![
+                (
+                    0,
+                    Account {
+                        total: dec!(50.0),
+                        held: dec!(0),
+                        locked: true,
+                        has_activity: true
+                    }
+                ),
+                (
+                    1,
+                    Account {
+                        total: dec!(150.0),
+                        held: dec!(0),
+                        locked: false,
+                        has_activity: true
+                    }
+                )
+            ]
+        );
+    }
 }
