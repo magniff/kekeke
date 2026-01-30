@@ -19,7 +19,7 @@ impl Default for Payments {
 impl Payments {
     pub fn process_transaction(&mut self, transaction: &Transaction) {
         let account = self.get_account_mut(transaction.cid);
-        if account.locked {
+        if account.is_locked {
             return;
         }
 
@@ -169,7 +169,7 @@ impl Payments {
                                 let account = self.get_account_mut(transaction.cid);
                                 account.held -= amount;
                                 account.total -= amount;
-                                account.locked = true;
+                                account.is_locked = true;
                             }
                             // Charging back a deposit transaction: forcing the transaction
                             // What it means:
@@ -183,7 +183,7 @@ impl Payments {
                                 let amount = *amount;
                                 let account = self.get_account_mut(transaction.cid);
                                 account.held -= amount;
-                                account.locked = true;
+                                account.is_locked = true;
                             }
                         }
                     }
@@ -245,7 +245,7 @@ mod tests {
                 Account {
                     total: dec!(30),
                     held: dec!(0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -285,7 +285,7 @@ mod tests {
                 Account {
                     total: dec!(30),
                     held: dec!(20),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -330,7 +330,7 @@ mod tests {
                 Account {
                     total: dec!(30),
                     held: dec!(0),
-                    locked: true,
+                    is_locked: true,
                     has_activity: true
                 }
             )]
@@ -375,7 +375,7 @@ mod tests {
                 Account {
                     total: dec!(10),
                     held: dec!(0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -415,7 +415,7 @@ mod tests {
                 Account {
                     total: dec!(0),
                     held: dec!(0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -450,7 +450,7 @@ mod tests {
                 Account {
                     total: dec!(10.0),
                     held: dec!(0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -490,7 +490,7 @@ mod tests {
                 Account {
                     total: dec!(10.0),
                     held: dec!(5.0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -540,7 +540,7 @@ mod tests {
                 Account {
                     total: dec!(10.0),
                     held: dec!(5.0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -585,7 +585,7 @@ mod tests {
                 Account {
                     total: dec!(10.0),
                     held: dec!(0.0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -630,7 +630,7 @@ mod tests {
                 Account {
                     total: dec!(5.0),
                     held: dec!(0.0),
-                    locked: true,
+                    is_locked: true,
                     has_activity: true
                 }
             )]
@@ -675,7 +675,7 @@ mod tests {
                 Account {
                     total: dec!(50.0),
                     held: dec!(50.0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -694,7 +694,7 @@ mod tests {
                 Account {
                     total: dec!(50.0),
                     held: dec!(0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -738,7 +738,7 @@ mod tests {
                 Account {
                     total: dec!(10.0),
                     held: dec!(0.0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -788,7 +788,7 @@ mod tests {
                 Account {
                     total: dec!(50.0),
                     held: dec!(0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )
@@ -800,7 +800,7 @@ mod tests {
                 Account {
                     total: dec!(125.0),
                     held: dec!(0),
-                    locked: false,
+                    is_locked: false,
                     has_activity: true
                 }
             )
@@ -839,7 +839,7 @@ mod tests {
                     Account {
                         total: dec!(100.0),
                         held: dec!(0),
-                        locked: false,
+                        is_locked: false,
                         has_activity: true
                     }
                 ),
@@ -848,7 +848,7 @@ mod tests {
                     Account {
                         total: dec!(0.0),
                         held: dec!(0),
-                        locked: false,
+                        is_locked: false,
                         has_activity: true
                     }
                 ),
@@ -920,7 +920,7 @@ mod tests {
                     Account {
                         total: dec!(50.0),
                         held: dec!(0),
-                        locked: true,
+                        is_locked: true,
                         has_activity: true
                     }
                 ),
@@ -929,7 +929,7 @@ mod tests {
                     Account {
                         total: dec!(150.0),
                         held: dec!(0),
-                        locked: false,
+                        is_locked: false,
                         has_activity: true
                     }
                 )

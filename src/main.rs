@@ -64,7 +64,7 @@ fn main() -> anyhow::Result<()> {
             available: account.total - account.held,
             held: account.held,
             total: account.total,
-            locked: account.locked,
+            locked: account.is_locked,
         });
 
     // Actually writing the output to stdout

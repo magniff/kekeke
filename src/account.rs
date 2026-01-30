@@ -4,7 +4,8 @@ use rust_decimal::Decimal;
 pub struct Account {
     pub total: Decimal,
     pub held: Decimal,
-    pub locked: bool,
+    pub is_locked: bool,
+    // to filter out relevant acc for output
     pub has_activity: bool,
 }
 
