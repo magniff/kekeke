@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{Account, Action, ActionKind, Transaction, TransactionKind};
+use crate::{Account, Action, ActionKind, Transaction, TransactionKind, transaction::ActionStatus};
 
 pub struct Payments {
     pub accounts: Vec<Account>,
@@ -37,7 +37,7 @@ impl Payments {
                     Action {
                         cid: transaction.cid,
                         kind: ActionKind::Deposit { amount },
-                        disputed: false,
+                        status: ActionStatus::Fresh,
                     },
                 );
             }
@@ -51,7 +51,7 @@ impl Payments {
                         Action {
                             cid: transaction.cid,
                             kind: ActionKind::Withdrawal { amount },
-                            disputed: false,
+                            status: ActionStatus::Fresh,
                         },
                     );
                 }
@@ -69,12 +69,12 @@ impl Payments {
 
                 match transaction.kind {
                     TransactionKind::Dispute => {
-                        // Skipping if already disputed
-                        if action.disputed {
+                        // Skipping if already disputed or final
+                        if action.status != ActionStatus::Fresh {
                             return;
                         }
                         // This transaction is sus now, watch out
-                        action.disputed = true;
+                        action.status = ActionStatus::Disputed;
                         match action {
                             // Disputing a withdrawal transaction
                             // What it means:
@@ -112,10 +112,10 @@ impl Payments {
                     }
                     TransactionKind::Resolve => {
                         // Cant resolve what's not disputed, right?
-                        if !action.disputed {
+                        if action.status != ActionStatus::Disputed {
                             return;
                         }
-                        action.disputed = false;
+                        action.status = ActionStatus::Final;
                         match action {
                             // Resolving a withdrawal transaction, reverting the transaction
                             // What it means:
@@ -151,10 +151,10 @@ impl Payments {
                     }
                     TransactionKind::Chargeback => {
                         // Cant resolve what's not disputed, right?
-                        if !action.disputed {
+                        if action.status != ActionStatus::Disputed {
                             return;
                         }
-                        action.disputed = false;
+                        action.status = ActionStatus::Final;
                         match action {
                             // Charging back a withdrawal transaction: forcing the transaction
                             // What it means:

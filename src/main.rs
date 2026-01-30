@@ -3,7 +3,7 @@ use csv::{ReaderBuilder, Writer};
 use std::io;
 
 mod transaction;
-use transaction::{Action, ActionKind, Transaction, TransactionKind};
+use transaction::{Action, ActionKind, ActionStatus, Transaction, TransactionKind};
 
 mod payments;
 use payments::Payments;

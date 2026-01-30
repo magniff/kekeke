@@ -23,11 +23,23 @@ pub enum ActionKind {
     Withdrawal { amount: Decimal },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionStatus {
+    // All actions are born with status == fresh
+    Fresh,
+    // If the client ever tries to dispute the transaction
+    // it becomes status == disputed
+    Disputed,
+    // After being resolved or charged back
+    // it becomes status == final
+    Final,
+}
+
 #[derive(Debug, Clone)]
 pub struct Action {
     pub cid: u16,
     pub kind: ActionKind,
-    pub disputed: bool,
+    pub status: ActionStatus,
 }
 
 impl<'de> Deserialize<'de> for Transaction {
