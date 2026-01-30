@@ -23,7 +23,10 @@ impl Payments {
             return;
         }
 
+        // The stats console printer will pick up only the active users
+        // so marking that one as active
         account.has_activity = true;
+
         // NOTE: we are about to store the transaction for later, and as a storage key
         // we are using the tid - transaction id.
         // We are not gonna sanitize it in any way here, according to the spec they
@@ -263,12 +266,7 @@ mod tests {
             },
             Transaction {
                 cid: 0,
-                tid: 1,
-                kind: TransactionKind::Deposit { amount: dec!(20.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
+                tid: 0,
                 kind: TransactionKind::Dispute,
             },
         ];
@@ -283,8 +281,8 @@ mod tests {
             vec![(
                 0,
                 Account {
-                    total: dec!(30),
-                    held: dec!(20),
+                    total: dec!(10.0),
+                    held: dec!(10.0),
                     is_locked: false,
                     has_activity: true
                 }
@@ -293,7 +291,87 @@ mod tests {
     }
 
     #[test]
-    fn test_deposit_dispute_force() {
+    fn test_deposit_dispute_resolve() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit { amount: dec!(10.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Dispute,
+            },
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Resolve,
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        let active_clients = get_active_accounts(&payments);
+        assert_eq!(
+            active_clients,
+            vec![(
+                0,
+                Account {
+                    total: dec!(0.0),
+                    held: dec!(0.0),
+                    is_locked: false,
+                    has_activity: true
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn test_deposit_dispute_chargeback() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit { amount: dec!(10.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Dispute,
+            },
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Chargeback,
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        let active_clients = get_active_accounts(&payments);
+        assert_eq!(
+            active_clients,
+            vec![(
+                0,
+                Account {
+                    total: dec!(10.0),
+                    held: dec!(0.0),
+                    is_locked: true,
+                    has_activity: true
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn test_deposit_dispute_two_transactions() {
         let mut payments = Payments::default();
         let transactions = vec![
             Transaction {
@@ -328,54 +406,9 @@ mod tests {
             vec![(
                 0,
                 Account {
-                    total: dec!(30),
+                    total: dec!(30.0),
                     held: dec!(0),
                     is_locked: true,
-                    has_activity: true
-                }
-            )]
-        );
-    }
-
-    #[test]
-    fn test_deposit_dispute_rollback() {
-        let mut payments = Payments::default();
-        let transactions = vec![
-            Transaction {
-                cid: 0,
-                tid: 0,
-                kind: TransactionKind::Deposit { amount: dec!(10.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Deposit { amount: dec!(20.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Dispute,
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Resolve,
-            },
-        ];
-
-        for transaction in transactions {
-            payments.process_transaction(&transaction);
-        }
-
-        let active_clients = get_active_accounts(&payments);
-        assert_eq!(
-            active_clients,
-            vec![(
-                0,
-                Account {
-                    total: dec!(10),
-                    held: dec!(0),
-                    is_locked: false,
                     has_activity: true
                 }
             )]
@@ -389,17 +422,12 @@ mod tests {
             Transaction {
                 cid: 0,
                 tid: 0,
-                kind: TransactionKind::Deposit { amount: dec!(10.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
                 kind: TransactionKind::Deposit { amount: dec!(20.0) },
             },
             Transaction {
                 cid: 0,
-                tid: 2,
-                kind: TransactionKind::Withdrawal { amount: dec!(30.0) },
+                tid: 1,
+                kind: TransactionKind::Deposit { amount: dec!(15.0) },
             },
         ];
 
@@ -413,7 +441,7 @@ mod tests {
             vec![(
                 0,
                 Account {
-                    total: dec!(0),
+                    total: dec!(5.0),
                     held: dec!(0),
                     is_locked: false,
                     has_activity: true
@@ -593,7 +621,7 @@ mod tests {
     }
 
     #[test]
-    fn test_withdraw_dispute_chargeback() {
+    fn test_withdrawal_dispute_chargeback() {
         let mut payments = Payments::default();
         let transactions = vec![
             Transaction {
@@ -934,6 +962,59 @@ mod tests {
                     }
                 )
             ]
+        );
+    }
+
+    #[test]
+    fn test_overdraft() {
+        let mut payments = Payments::default();
+        let transactions = vec![
+            // Client 0 setup
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Deposit {
+                    amount: dec!(100.0),
+                },
+            },
+            Transaction {
+                cid: 0,
+                tid: 1,
+                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 2,
+                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
+            },
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Dispute,
+            },
+            Transaction {
+                cid: 0,
+                tid: 0,
+                kind: TransactionKind::Resolve,
+            },
+        ];
+
+        for transaction in transactions {
+            payments.process_transaction(&transaction);
+        }
+
+        // Client 0 is locked, deposit didn't go through
+        assert_eq!(
+            get_active_accounts(&payments),
+            vec![(
+                0,
+                Account {
+                    total: dec!(-100.0),
+                    held: dec!(0.0),
+                    is_locked: false,
+                    has_activity: true
+                }
+            )]
         );
     }
 }
