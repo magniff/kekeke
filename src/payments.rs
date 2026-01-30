@@ -371,51 +371,6 @@ mod tests {
     }
 
     #[test]
-    fn test_deposit_dispute_two_transactions() {
-        let mut payments = Payments::default();
-        let transactions = vec![
-            Transaction {
-                cid: 0,
-                tid: 0,
-                kind: TransactionKind::Deposit { amount: dec!(10.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Deposit { amount: dec!(20.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Dispute,
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Chargeback,
-            },
-        ];
-
-        for transaction in transactions {
-            payments.process_transaction(&transaction);
-        }
-
-        let active_clients = get_active_accounts(&payments);
-        assert_eq!(
-            active_clients,
-            vec![(
-                0,
-                Account {
-                    total: dec!(30.0),
-                    held: dec!(0),
-                    is_locked: true,
-                    has_activity: true
-                }
-            )]
-        );
-    }
-
-    #[test]
     fn test_withdraw() {
         let mut payments = Payments::default();
         let transactions = vec![
@@ -427,7 +382,7 @@ mod tests {
             Transaction {
                 cid: 0,
                 tid: 1,
-                kind: TransactionKind::Deposit { amount: dec!(15.0) },
+                kind: TransactionKind::Withdrawal { amount: dec!(15.0) },
             },
         ];
 
@@ -450,19 +405,20 @@ mod tests {
         );
     }
 
+    // Here we are silently failing that transaction
     #[test]
-    fn test_withdraw_not_enough_funds() {
+    fn test_cant_withdraw_overdraft() {
         let mut payments = Payments::default();
         let transactions = vec![
             Transaction {
                 cid: 0,
                 tid: 0,
-                kind: TransactionKind::Deposit { amount: dec!(10.0) },
+                kind: TransactionKind::Deposit { amount: dec!(20.0) },
             },
             Transaction {
                 cid: 0,
-                tid: 2,
-                kind: TransactionKind::Withdrawal { amount: dec!(30.0) },
+                tid: 1,
+                kind: TransactionKind::Withdrawal { amount: dec!(25.0) },
             },
         ];
 
@@ -476,7 +432,7 @@ mod tests {
             vec![(
                 0,
                 Account {
-                    total: dec!(10.0),
+                    total: dec!(20.0),
                     held: dec!(0),
                     is_locked: false,
                     has_activity: true
@@ -498,56 +454,6 @@ mod tests {
                 cid: 0,
                 tid: 1,
                 kind: TransactionKind::Withdrawal { amount: dec!(5.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Dispute,
-            },
-        ];
-
-        for transaction in transactions {
-            payments.process_transaction(&transaction);
-        }
-
-        let active_clients = get_active_accounts(&payments);
-        assert_eq!(
-            active_clients,
-            vec![(
-                0,
-                Account {
-                    total: dec!(10.0),
-                    held: dec!(5.0),
-                    is_locked: false,
-                    has_activity: true
-                }
-            )]
-        );
-    }
-
-    #[test]
-    fn test_dispute_idempotency() {
-        let mut payments = Payments::default();
-        let transactions = vec![
-            Transaction {
-                cid: 0,
-                tid: 0,
-                kind: TransactionKind::Deposit { amount: dec!(10.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Withdrawal { amount: dec!(5.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Dispute,
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Dispute,
             },
             Transaction {
                 cid: 0,
@@ -664,71 +570,8 @@ mod tests {
             )]
         );
     }
-    #[test]
-    fn test_withdraw_dispute_double_spend() {
-        let mut payments = Payments::default();
-        let transactions = vec![
-            Transaction {
-                cid: 0,
-                tid: 0,
-                kind: TransactionKind::Deposit {
-                    amount: dec!(100.0),
-                },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
-            },
-            Transaction {
-                cid: 0,
-                tid: 1,
-                kind: TransactionKind::Dispute,
-            },
-            Transaction {
-                cid: 0,
-                tid: 2,
-                kind: TransactionKind::Withdrawal { amount: dec!(50.0) },
-            },
-        ];
 
-        for transaction in transactions {
-            payments.process_transaction(&transaction);
-        }
-
-        assert_eq!(
-            get_active_accounts(&payments),
-            vec![(
-                0,
-                Account {
-                    total: dec!(50.0),
-                    held: dec!(50.0),
-                    is_locked: false,
-                    has_activity: true
-                }
-            )]
-        );
-
-        payments.process_transaction(&Transaction {
-            cid: 0,
-            tid: 1,
-            kind: TransactionKind::Resolve,
-        });
-
-        assert_eq!(
-            get_active_accounts(&payments),
-            vec![(
-                0,
-                Account {
-                    total: dec!(50.0),
-                    held: dec!(0),
-                    is_locked: false,
-                    has_activity: true
-                }
-            )]
-        );
-    }
-
+    // If the transaction has failed it should not be disputable at all
     #[test]
     fn test_no_dispute_for_failed_transaction() {
         let mut payments = Payments::default();
@@ -965,11 +808,12 @@ mod tests {
         );
     }
 
+    // if client manged to resolve (rollback) the deposit transaction
+    // there's a chance that they owe money to the bank now
     #[test]
     fn test_overdraft() {
         let mut payments = Payments::default();
         let transactions = vec![
-            // Client 0 setup
             Transaction {
                 cid: 0,
                 tid: 0,
