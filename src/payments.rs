@@ -56,7 +56,7 @@ impl Payments {
                     );
                 }
             }
-            // Processing dispute situations
+            // Processing dispute/resolve/chargeback situations
             TransactionKind::Dispute | TransactionKind::Resolve | TransactionKind::Chargeback => {
                 // Check if we've seen that transaction before
                 let Some(action) = self.actions.get_mut(&transaction.tid) else {
